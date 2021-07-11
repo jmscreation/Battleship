@@ -5,13 +5,14 @@ REM Set Compiler Settings Here
 
 set CPP=c++
 set GPP=g++
-set WINRES=windres
 set ARCH=64
 set OUTPUT=program.exe
 set DEBUGMODE=0
-
+set FLAGS=-I. -Isrc -Icompleted -std=c++20
 
 del %OUTPUT% 2>nul
+
+del /S /Q .objs64\*.o
 
 setlocal enabledelayedexpansion
 
@@ -20,11 +21,23 @@ if not exist .objs64 (
 	mkdir .objs64
 )
 
+if not exist completed (
+	echo Creating Object Directory Structure...
+	mkdir completed
+)
+
 echo Building Game Files...
-for %%F in (*.cpp) do (
+for %%F in (src\*.cpp) do (
 	if not exist .objs64\%%~nF.o (
 		echo Building %%~nF.o
-		start /B "%%~nF.o" %CPP% -std=c++20 -c %%F -o .objs64\%%~nF.o
+		start /B "%%~nF.o" %CPP% %FLAGS% -c %%F -o .objs64\%%~nF.o
+	)
+)
+
+for %%F in (completed\*.cpp) do (
+	if not exist completed\%%~nF.o (
+		echo Building %%~nF.o
+		start /B "%%~nF.o" %CPP% %FLAGS% -c %%F -o completed\%%~nF.o
 	)
 )
 
@@ -41,7 +54,8 @@ if %count%==0 (
 :linker
 
 set "files="
-for /f "delims=" %%A in ('dir /b /a-d ".objs64\%*" ') do set "files=!files! .objs64\%%A"
+for /f "delims=" %%A in ('dir /b /a-d ".objs64\*.o" ') do set "files=!files! .objs64\%%A"
+for /f "delims=" %%A in ('dir /b /a-d "completed\*.o" ') do set "files=!files! completed\%%A"
 
 echo Linking Executable...
 if %ARCH%==64 (
@@ -60,7 +74,7 @@ if %DEBUGMODE% GTR 0 (
 	set MWINDOWS=-mwindows
 )
 
-%GPP% -L.\library -o %OUTPUT% %files% -s -static-libstdc++ -lpthread -static -lsetupapi -lwinmm -luser32 -lgdi32 -lopengl32 -lgdiplus -lShlwapi -ldwmapi -lstdc++fs %MWINDOWS%
+%GPP% -o %OUTPUT% %files% -static-libstdc++ -lpthread -static -lsetupapi -lwinmm -luser32 -lgdi32 -lopengl32 -lgdiplus -lShlwapi -ldwmapi -lstdc++fs %MWINDOWS%
 
 :finish
 if exist .\%OUTPUT% (
@@ -69,4 +83,4 @@ if exist .\%OUTPUT% (
 	echo Build Failed!
 )
 
-pause>nul
+%OUTPUT%

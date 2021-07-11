@@ -5,12 +5,13 @@ GameController::GameController(olc::PixelGameEngine& pge): pge(pge) {
 
 }
 
+GameController::~GameController() {}
+
 void GameController::update(float delta) {
     for(Ship& ship : ships){
         drawShip(ship);
     }
 }
-
 
 
 void GameController::drawShip(GameController::Ship& ship) {
