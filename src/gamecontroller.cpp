@@ -1,5 +1,7 @@
 #include "gamecontroller.h"
 
+olc::PixelGameEngine* game::GameObj::pge = nullptr;
+game::GameController* game::GameObj::ctrl = nullptr;
 
 game::GameController::GameController(olc::PixelGameEngine* pge, Multiplayer* mp, int width, int height):
     pge(pge), mp(mp), width(width), height(height) {
