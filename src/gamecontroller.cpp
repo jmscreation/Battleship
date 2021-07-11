@@ -4,11 +4,11 @@
 game::GameController::GameController(olc::PixelGameEngine* pge, Multiplayer* mp, int width, int height):
     pge(pge), mp(mp), width(width), height(height) {
 
-    GameObj::pge = &pge;
+    GameObj::pge = pge;
     GameObj::ctrl = this;
 
-    screenW = pge.ScreenWidth();
-    screenH = pge.ScreenHeight();
+    screenW = pge->ScreenWidth();
+    screenH = pge->ScreenHeight();
 
     cw = screenW / 2 / width;
     ch = screenH / height;

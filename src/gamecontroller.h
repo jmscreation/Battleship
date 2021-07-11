@@ -10,16 +10,15 @@ namespace game {
 
     class GameController;
 
-    class GameObj {
-    public:
+    struct GameObj {
         static olc::PixelGameEngine* pge;
         static GameController* ctrl;
 
-        olc::vi2d pos;
+        int x, y;
         virtual void draw() = 0;
     };
 
-    class Ship: public GameObj {
+    struct Ship: public GameObj {
         enum DIR {
             HOR, VERT,
         } dir;
@@ -28,12 +27,12 @@ namespace game {
 
         virtual void draw();
     };
-    class Splash: public GameObj {
+    struct Splash: public GameObj {
         int t;
 
         virtual void draw();
     };
-    class Hit: public GameObj {
+    struct Hit: public GameObj {
         int t;
 
         virtual void draw();
