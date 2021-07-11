@@ -8,7 +8,8 @@ set GPP=g++
 set ARCH=64
 set OUTPUT=program.exe
 set DEBUGMODE=0
-set FLAGS=-I. -Isrc -Icompleted -std=c++20
+set FLAGS=-I. -Isrc -Icompleted -Ilibrary\SFML-2.5.1\include -std=c++20 -DSFML_STATIC
+set LINKING=-Llibrary\SFML-2.5.1\lib64 -static -lsfml-network-s -lsfml-system-s -lwinmm -lws2_32 -static-libstdc++ -lpthread -lsetupapi -luser32 -lgdi32 -lopengl32 -lgdiplus -lShlwapi -ldwmapi -lstdc++fs
 
 del %OUTPUT% 2>nul
 
@@ -30,7 +31,7 @@ echo Building Game Files...
 for %%F in (src\*.cpp) do (
 	if not exist .objs64\%%~nF.o (
 		echo Building %%~nF.o
-		start /B "%%~nF.o" %CPP% %FLAGS% -c %%F -o .objs64\%%~nF.o
+		start /B /WAIT "%%~nF.o" %CPP% %FLAGS% -c %%F -o .objs64\%%~nF.o
 	)
 )
 
@@ -74,7 +75,7 @@ if %DEBUGMODE% GTR 0 (
 	set MWINDOWS=-mwindows
 )
 
-%GPP% -o %OUTPUT% %files% -static-libstdc++ -lpthread -static -lsetupapi -lwinmm -luser32 -lgdi32 -lopengl32 -lgdiplus -lShlwapi -ldwmapi -lstdc++fs %MWINDOWS%
+%GPP% -o %OUTPUT% %files% %LINKING% %MWINDOWS%
 
 :finish
 if exist .\%OUTPUT% (
