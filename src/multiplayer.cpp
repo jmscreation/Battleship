@@ -77,5 +77,9 @@ void Multiplayer::update(float delta){
 
     // Is Connected
 
-    
+    status = socket.send(out);
+    out.clear();
+
+    socket.receive(in);
+
 }
