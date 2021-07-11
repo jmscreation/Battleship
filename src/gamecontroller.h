@@ -2,7 +2,6 @@
 
 #include "olcPixelGameEngine.h"
 #include <vector>
-#include <list>
 #include <iostream>
 #include "multiplayer.h"
 
@@ -15,6 +14,7 @@ namespace game {
         static GameController* ctrl;
 
         int x, y;
+        virtual void control() = 0;
         virtual void draw() = 0;
     };
 
@@ -25,16 +25,19 @@ namespace game {
 
         int health;
 
+        virtual void control();
         virtual void draw();
     };
     struct Splash: public GameObj {
         int t;
 
+        virtual void control();
         virtual void draw();
     };
     struct Hit: public GameObj {
         int t;
 
+        virtual void control();
         virtual void draw();
     };
 
@@ -47,20 +50,23 @@ namespace game {
         int screenW, screenH;
         int cw, ch;
         int hwidth;
+
+        bool endGame;
+        int delay;
         
         Ship* selected;
 
         GameController(olc::PixelGameEngine* pge, Multiplayer* mp, int width=20, int height=20);
         virtual ~GameController();
 
-        virtual void update(float delta);
+        virtual bool update(float delta);
 
         void control();
         void render();
 
-        std::vector<Ship> ships;
-        std::vector<Splash> splashes;
-        std::vector<Hit> hits;
+        std::vector<Ship*> ships;
+        std::vector<Splash*> splashes;
+        std::vector<Hit*> hits;
     };
 
 }

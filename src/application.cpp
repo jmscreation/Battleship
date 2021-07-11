@@ -50,9 +50,8 @@ public:
 	bool OnUserUpdate(float elapsedTime) {
 
 		mplay->update(elapsedTime);
-		gamecontroller->update(elapsedTime);
+		return gamecontroller->update(elapsedTime);
 
-		return true;
 	}
 	
 };
@@ -64,6 +63,6 @@ int main(int argc, char** argv){
 		parameters.push_back(argv[i]);
 	}
 
-	Game app(400, 400);
+	Game app(800, 400, 2, 2);
 	return 0;
 }
