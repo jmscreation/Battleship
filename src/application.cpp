@@ -29,6 +29,16 @@ public:
 	Multiplayer* mplay;
 
 public:
+	void endMplay() {
+		delete mplay;
+		mplay = nullptr;
+	}
+
+	void endGame() {
+		delete gamecontroller;
+		gamecontroller = nullptr;
+	}
+
 	bool OnUserCreate() {
 		mplay = new Multiplayer;
 		gamecontroller = nullptr;
@@ -53,45 +63,37 @@ public:
 
 		if(!mplay->update(elapsedTime)){
 			std::cout << "Multiplayer system closed application\n";
-			delete gamecontroller;
-			gamecontroller = nullptr;
-
-			delete mplay;
-			mplay = nullptr;
-
+			endMplay();
+			endGame();
 			return false;
 		}
 
 		if(mplay->isConnected()){
-			// send a test message
-			/*
-			static sf::Clock test;
-			if(test.getElapsedTime().asSeconds() > 1.0f) {
-				const char* data = "hello world";
-				mplay->send(10, (const void*)data, 11);
-				test.restart();
-			}
-			*/
 			if(gamecontroller == nullptr){
 				gamecontroller = new game::GameController(this, mplay);
 			}
 		} else {
+			if(mplay->isHost()){
+				DrawString(16, 48, "Waiting For Client...");
+			} else {
+				DrawString(16, 48, "Connecting To Server...");
+			}
+			if(GetKey(olc::ESCAPE).bPressed){
+				endMplay();
+				endGame();
+				return false;
+			}
+
 			if(gamecontroller != nullptr) {
-				delete gamecontroller;
-				gamecontroller = nullptr;
+				endGame();
 				Clear(olc::BLANK);
 			}
 		}
 		if(gamecontroller != nullptr){
 			if(!gamecontroller->update(elapsedTime)){
 				std::cout << "GameController closed application\n";
-				mplay->clear(); // close mplay
-
-				delete gamecontroller;
-				gamecontroller = nullptr;
-
-				delete mplay;
-				mplay = nullptr;
+				endGame();
+				endMplay();
 				return false;
 			}
 		}

@@ -15,13 +15,14 @@ private:
     sf::TcpListener server;
     sf::TcpSocket* socket;
     
-    sf::Thread* tsender;
+    sf::Thread *tsender, *treceiver;
     sf::Mutex mutex;
 
     sf::IpAddress useIP;
     const short port;
 
     std::atomic<bool> ishost, isrunning, isconnected;
+    std::atomic<sf::Socket::Status> syncStatus;
 
     sf::Packet in, out;
 
@@ -31,11 +32,13 @@ private:
 
     char* inbuffer;
 
+
 public:
     Multiplayer();
     virtual ~Multiplayer();
 
     static void sendHandle(Multiplayer* ths);
+    static void receiveHandle(Multiplayer* ths);
 
     inline bool isHost() { return ishost; }
     inline bool isConnected() { return isconnected; }

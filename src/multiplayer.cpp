@@ -2,8 +2,10 @@
 #include <iostream>
 #include <vector>
 
-Multiplayer::Multiplayer(): socket(new sf::TcpSocket), tsender(new sf::Thread(sendHandle, this)),
+Multiplayer::Multiplayer(): socket(new sf::TcpSocket),
+    tsender(new sf::Thread(sendHandle, this)), treceiver(new sf::Thread(receiveHandle, this)),
     useIP(sf::IpAddress::Any), port(55883), ishost(false), isrunning(false), isconnected(false),
+    syncStatus(sf::Socket::NotReady),
     onMessage([](int cmd, void* buf, size_t len) {
         std::cout << "unhandled message: [" << cmd << "] " << len << " bytes: ";
 
@@ -16,6 +18,7 @@ Multiplayer::Multiplayer(): socket(new sf::TcpSocket), tsender(new sf::Thread(se
     }) {
 
     tsender->launch();
+    treceiver->launch();
     
     socket->setBlocking(false);
     server.setBlocking(false);
@@ -25,7 +28,9 @@ Multiplayer::Multiplayer(): socket(new sf::TcpSocket), tsender(new sf::Thread(se
 
 Multiplayer::~Multiplayer() {
     tsender->terminate();
+    treceiver->terminate();
     delete tsender;
+    delete treceiver;
     delete socket;
     delete[] inbuffer;
 }
@@ -114,55 +119,42 @@ bool Multiplayer::update(float delta){
         return true;
     }
 
+    status = syncStatus;
 
     // Is Connected
 
-    do {
-        status = socket->receive(in);
-
-        switch(status) {
-            case sf::Socket::Disconnected:
-            case sf::Socket::Error:{
-                std::cout << "Socket error\n";
-                
-                showMessage(ishost ? "Error: Client Disconnected!" : "Error: Server Disconnected!", "Error", MSG_ERROR);
-                bool _ishost = ishost;
-                clear();
-                
-                if(_ishost){
-                    host(useIP);
-                 } else {
-                    connect(useIP);
-                 }
-                break;
-            }
-            case sf::Socket::Partial:{
-                std::cout << "Receiving partial packet\n";
-                sf::sleep(sf::milliseconds(2));
-                continue;
-            }
-            case sf::Socket::Done:{
-                do {
-                    sf::Int32 cmd;
-                    sf::Uint64 size;
-
-                    if(!(in >> cmd >> size)) break;
-
-                    const void* d = (const char*)in.getData() + sizeof(cmd) + sizeof(size);
-                    if(d != nullptr){
-                        memcpy(inbuffer, d, size);
-                    }
-                    in.clear();
-
-                    onMessage(cmd, inbuffer, size);
-                } while(!in.endOfPacket());
-
-                break;
-            }
+    switch(status) {
+        case sf::Socket::Disconnected:
+        case sf::Socket::Error:{
+            std::cout << "Socket error\n";
+            
+            showMessage(ishost ? "Error: Client Disconnected!" : "Error: Server Disconnected!", "Error", MSG_ERROR);
+            bool _ishost = ishost;
+            clear();
+            
+            if(_ishost){
+                host(useIP);
+                } else {
+                connect(useIP);
+                }
+            break;
         }
+        case sf::Socket::Done:{
+            sf::Int32 cmd;
+            sf::Uint64 size;
 
-        break; // do not loop
-    } while(1);
+            if(!(in >> cmd >> size)) break;
+
+            const void* d = (const char*)in.getData() + sizeof(cmd) + sizeof(size);
+            if(d != nullptr){
+                memcpy(inbuffer, d, size);
+            }
+            in.clear();
+
+            onMessage(cmd, inbuffer, size);
+            break;
+        }
+    }
 
     return true;
 }
@@ -189,25 +181,65 @@ void Multiplayer::sendHandle(Multiplayer* _this){
         
         if(!me.isconnected) continue;
 
-        if(ready) {
+        {
             sf::Lock lock(me.mutex);
-            out.clear();
-            out.append(me.out.getData(), me.out.getDataSize()); // copy packet
-            me.out.clear();
-            ready = false;
-        }
-
-        sf::Socket::Status status = me.socket->send(out);
-
-        switch(status){
-            case sf::Socket::Done:{
-                ready = true;
-                break;
-            }
-            case sf::Socket::Partial:{
+            
+            if(ready) {
+                out.clear();
+                out.append(me.out.getData(), me.out.getDataSize()); // copy packet
+                me.out.clear();
                 ready = false;
-                break;
             }
+
+            sf::Socket::Status status = me.socket->send(out);
+
+            switch(status){
+                case sf::Socket::Done:{
+                    ready = true;
+                    break;
+                }
+                case sf::Socket::Partial:{
+                    ready = false;
+                    break;
+                }
+            }
+
+            me.syncStatus = status;
+        }
+    }
+}
+
+void Multiplayer::receiveHandle(Multiplayer* _this) {
+    
+
+    Multiplayer& me = *_this;
+    
+    sf::Packet in;
+    bool ready = false;
+
+    while(1){
+        sf::sleep(sf::milliseconds(30));
+        
+        if(!me.isconnected) continue;
+
+        {
+            sf::Lock lock(me.mutex);
+
+            sf::Socket::Status status = me.socket->receive(in);
+
+            switch(status){
+                case sf::Socket::Done:{
+                    ready = true;
+                    break;
+                }
+            }
+
+            if(ready) {
+                me.in.append(in.getData(), in.getDataSize());
+                ready = false;
+            }
+
+            me.syncStatus = status;
         }
     }
 }
