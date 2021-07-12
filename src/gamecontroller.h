@@ -26,7 +26,9 @@ namespace game {
         void SetFPS(float fps) { this->fps = fps; timeDiff = int(1000.f / fps); }
         float GetFPS() { return fps; }
         void Wait() {
-            while(timer.getElapsedTime().asMilliseconds() - lastTime < timeDiff);
+            int delta = timer.getElapsedTime().asMilliseconds() - lastTime;
+            if(delta < timeDiff)
+                sf::sleep(sf::milliseconds(timeDiff - delta));
             lastTime = timer.getElapsedTime().asMilliseconds();
         }
     };
@@ -76,6 +78,13 @@ namespace game {
         virtual void draw();
     };
 
+    struct MsgShoot {
+        int x, y;
+    };
+    struct MsgShootReply {
+        int x, y, status;
+    };
+
     class GameController {
         static GameController* ctrl;
         olc::PixelGameEngine* pge;
@@ -109,7 +118,7 @@ namespace game {
         void render();
 
         void spawnShips(int num);
-        bool landHit(int x, int y);
+        int landHit(int x, int y);
 
         std::vector<Ship*> ships;
         std::vector<Splash*> splashes;

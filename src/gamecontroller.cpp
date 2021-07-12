@@ -58,31 +58,29 @@ void game::GameController::receive(int cmd, const void* data, size_t len) {
 
     switch(cmd) {
         case SHOOT:{
-            int32_t x = ((int32_t*)data)[0],
-                    y = ((int32_t*)data)[1];
+            MsgShoot* msg = (MsgShoot*)data;
 
-            char reply[9];
-            *((int32_t*)(reply)) = x;
-            *((int32_t*)(reply+4)) = y;
-            reply[8] = ctrl->landHit(x,y);
+            int x = msg->x,
+                y = msg->y;
 
-            ctrl->mp->send(SHOOT_REPLY, &reply, 9);
+            MsgShootReply reply{
+                x, y, ctrl->landHit(x,y),
+            };
+            ctrl->mp->send(SHOOT_REPLY, &reply, sizeof(reply));
             break;
         }
         case SHOOT_REPLY:{
-            int32_t x = ((int32_t*)data)[0],
-                    y = ((int32_t*)data)[1];
-            bool struck = ((char*)data)[8];
+            MsgShootReply* msg = (MsgShootReply*)data;
 
-            if(struck) {
+            if(msg->status) {
                 Hit* hit = new Hit();
-                hit->x = x;
-                hit->y = y;
+                hit->x = msg->x;
+                hit->y = msg->y;
                 ctrl->hits.push_back(hit);
             } else {
                 Splash* sp = new Splash();
-                sp->x = x;
-                sp->y = y;
+                sp->x = msg->x;
+                sp->y = msg->y;
                 ctrl->splashes.push_back(sp);
             }
             break;
@@ -118,12 +116,15 @@ void game::GameController::control() {
     if(pge->GetMouse(olc::Mouse::LEFT).bPressed) {
         if(pge->GetMouseX() > hwidth) {
             if(!select) selected = nullptr;
-        } else if(selected != nullptr) {
+        } else if(selected != nullptr && delay == 0) {
             int32_t mx = pge->GetMouseX() / cw,
                     my = pge->GetMouseY() / ch;
-            uint64_t data = uint64_t(mx) << 32 | uint64_t(my);
-            
-            mp->send(SHOOT, &data, 8);
+
+            MsgShoot msg{
+                mx, my,
+            };
+            mp->send(SHOOT, &msg, sizeof(msg));
+            delay = DELAY_TIME;
         }
     }
 
@@ -186,26 +187,31 @@ void game::GameController::spawnShips(int num) {
         ships.push_back(ship);
     }
 }
-bool game::GameController::landHit(int x, int y) {
+int game::GameController::landHit(int x, int y) {
     for(auto& ship : ships) {
         int dx = abs(x - ship->x),
             dy = abs(y - ship->y);
         
-        if(ship->dir == Ship::HOR ? (dx < 2 && dy < 3) : (dy < 2 && dx < 3)) {
+        if(ship->dir == Ship::HOR ? (dx < 2 && dy < 1) : (dy < 2 && dx < 1)) {
             ship->health--;
             Hit* hit = new Hit(true);
+            hit->x = x;
+            hit->y = y;
             hits.push_back(hit);
-            return true;
+            if(!ship->health) return 2;
+            return 1;
         }
     }
     Splash* sp = new Splash(true);
+    sp->x = x;
+    sp->y = y;
     splashes.push_back(sp);
-    return false;
+    return 0;
 }
 
 game::GameObj::Action game::Ship::control() {
     if(health == 0) {
-        if(--t) return DESTROY;
+        if(!--t) return DESTROY;
         return NONE;
     }
 
