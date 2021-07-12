@@ -5,11 +5,12 @@ REM Set Compiler Settings Here
 
 set CPP=c++
 set GPP=g++
-set ARCH=64
 set OUTPUT=program.exe
-set DEBUGMODE=0
-set FLAGS=-I. -Isrc -Icompleted -Ilibrary\SFML-2.5.1\include -std=c++20 -DSFML_STATIC
+set DEBUGMODE=1
+set FLAGS=-I. -Isrc -Icompleted -Ilibrary\SFML-2.5.1\include -g -std=c++20 -DSFML_STATIC
 set LINKING=-Llibrary\SFML-2.5.1\lib64 -static -lsfml-network-s -lsfml-system-s -lwinmm -lws2_32 -static-libstdc++ -lpthread -lsetupapi -luser32 -lgdi32 -lopengl32 -lgdiplus -lShlwapi -ldwmapi -lstdc++fs
+set ASYNC_BUILD=1
+
 
 del %OUTPUT% 2>nul
 
@@ -27,18 +28,24 @@ if not exist completed (
 	mkdir completed
 )
 
+if %ASYNC_BUILD% GTR 0 (
+	set ASYNC=
+) else (
+	set ASYNC=/WAIT
+)
+
 echo Building Game Files...
 for %%F in (src\*.cpp) do (
 	if not exist .objs64\%%~nF.o (
 		echo Building %%~nF.o
-		start /B /WAIT "%%~nF.o" %CPP% %FLAGS% -c %%F -o .objs64\%%~nF.o
+		start /B %ASYNC% "%%~nF.o" %CPP% %FLAGS% -c %%F -o .objs64\%%~nF.o
 	)
 )
 
 for %%F in (completed\*.cpp) do (
 	if not exist completed\%%~nF.o (
 		echo Building %%~nF.o
-		start /B "%%~nF.o" %CPP% %FLAGS% -c %%F -o completed\%%~nF.o
+		start /B %ASYNC% "%%~nF.o" %CPP% %FLAGS% -c %%F -o completed\%%~nF.o
 	)
 )
 
@@ -58,16 +65,8 @@ set "files="
 for /f "delims=" %%A in ('dir /b /a-d ".objs64\*.o" ') do set "files=!files! .objs64\%%A"
 for /f "delims=" %%A in ('dir /b /a-d "completed\*.o" ') do set "files=!files! completed\%%A"
 
-echo Linking Executable...
-if %ARCH%==64 (
-	goto link
-)
-if %ARCH%==32 (
-	goto link
-)
-echo ARCH Must be 32 or 64! Make sure ARCH matches the compiler's architecture!
-goto finish
 :link
+echo Linking Executable...
 
 if %DEBUGMODE% GTR 0 (
 	set MWINDOWS=
@@ -84,4 +83,4 @@ if exist .\%OUTPUT% (
 	echo Build Failed!
 )
 
-%OUTPUT%
+%OUTPUT% host
