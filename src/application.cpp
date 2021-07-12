@@ -72,7 +72,6 @@ public:
 				test.restart();
 			}
 			*/
-
 			if(gamecontroller == nullptr){
 				gamecontroller = new game::GameController(this, mplay);
 			}

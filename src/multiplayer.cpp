@@ -4,7 +4,16 @@
 
 Multiplayer::Multiplayer(): socket(new sf::TcpSocket), tsender(new sf::Thread(sendHandle, this)),
     useIP(sf::IpAddress::Any), port(55883), ishost(false), isrunning(false), isconnected(false),
-    onMessage([](int cmd, void* buf, size_t len) { std::cout << "unhandled message: [" << cmd << "] " << len << " bytes\n";}) {
+    onMessage([](int cmd, void* buf, size_t len) {
+        std::cout << "unhandled message: [" << cmd << "] " << len << " bytes: ";
+
+        for(int i=0; i < len; ++i){
+            std::cout << ((char*)buf)[i];
+            //std::cout << (int)((char*)buf)[i] << ",";
+        }
+        std::cout << "\n";
+
+    }) {
 
     tsender->launch();
     
@@ -139,7 +148,7 @@ bool Multiplayer::update(float delta){
 
                     if(!(in >> cmd >> size)) break;
 
-                    const void* d = in.getData();
+                    const void* d = (const char*)in.getData() + sizeof(cmd) + sizeof(size);
                     if(d != nullptr){
                         memcpy(inbuffer, d, size);
                     }
@@ -176,7 +185,7 @@ void Multiplayer::sendHandle(Multiplayer* _this){
     bool ready = true;
 
     while(1){
-        sf::sleep(sf::milliseconds(2));
+        sf::sleep(sf::milliseconds(30));
         
         if(!me.isconnected) continue;
 
