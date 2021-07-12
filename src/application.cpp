@@ -50,8 +50,12 @@ public:
 	bool OnUserUpdate(float elapsedTime) {
 
 		mplay->update(elapsedTime);
-		return gamecontroller->update(elapsedTime);
-
+		if(!gamecontroller->update(elapsedTime)){
+			mplay->clear(); // close mplay
+			return false;
+		}
+		
+		return true;
 	}
 	
 };
