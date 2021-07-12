@@ -45,30 +45,39 @@ namespace game {
     };
 
     struct Ship: public GameObj {
+        Ship(): dir(Dir::HOR), health(3), t(60) {}
+
         enum Dir {
             HOR, VERT,
         } dir;
 
-        int health;
+        int health, t;
 
         virtual Action control();
         virtual void draw();
         bool collides();
     };
     struct Splash: public GameObj {
+        Splash(bool local=false): t(0), local(local) {}
+        
         int t;
+        bool local;
 
         virtual Action control();
         virtual void draw();
     };
     struct Hit: public GameObj {
+        Hit(bool local=false): t(0), local(local) {}
+
         int t;
+        bool local;
 
         virtual Action control();
         virtual void draw();
     };
 
     class GameController {
+        static GameController* ctrl;
         olc::PixelGameEngine* pge;
         Multiplayer* mp;
         FPSLimiter fps;
@@ -84,15 +93,23 @@ namespace game {
         
         Ship* selected;
 
+        enum Commands {
+            SHOOT,
+            SHOOT_REPLY,
+        };
+
         GameController(olc::PixelGameEngine* pge, Multiplayer* mp, int width=20, int height=20);
         virtual ~GameController();
 
         virtual bool update(float delta);
 
+        static void receive(int cmd, const void* data, size_t len);
+
         void control();
         void render();
 
         void spawnShips(int num);
+        bool landHit(int x, int y);
 
         std::vector<Ship*> ships;
         std::vector<Splash*> splashes;

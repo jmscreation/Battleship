@@ -6,8 +6,12 @@
 olc::PixelGameEngine* game::GameObj::pge = nullptr;
 game::GameController* game::GameObj::ctrl = nullptr;
 
+game::GameController* game::GameController::ctrl = nullptr;
+
 game::GameController::GameController(olc::PixelGameEngine* pge, Multiplayer* mp, int width, int height):
     pge(pge), mp(mp), fps(60), width(width), height(height) {
+
+    ctrl = this;
 
     GameObj::pge = pge;
     GameObj::ctrl = this;
@@ -25,9 +29,13 @@ game::GameController::GameController(olc::PixelGameEngine* pge, Multiplayer* mp,
     selected = nullptr;
 
     spawnShips(SHIPS_TO_SPAWN);
-}
+    srand(time(nullptr));
 
+    mp->updateCallback(&GameController::receive);
+}
 game::GameController::~GameController() {
+    if(ctrl == this) ctrl = nullptr;
+    
     for(auto& ship : ships)
         delete ship;
     for(auto& splash : splashes)
@@ -45,6 +53,43 @@ bool game::GameController::update(float delta) {
     return !endGame;
 }
 
+void game::GameController::receive(int cmd, const void* data, size_t len) {
+    if(ctrl == nullptr) return;
+
+    switch(cmd) {
+        case SHOOT:{
+            int32_t x = ((int32_t*)data)[0],
+                    y = ((int32_t*)data)[1];
+
+            char reply[9];
+            *((int32_t*)(reply)) = x;
+            *((int32_t*)(reply+4)) = y;
+            reply[8] = ctrl->landHit(x,y);
+
+            ctrl->mp->send(SHOOT_REPLY, &reply, 9);
+            break;
+        }
+        case SHOOT_REPLY:{
+            int32_t x = ((int32_t*)data)[0],
+                    y = ((int32_t*)data)[1];
+            bool struck = ((char*)data)[8];
+
+            if(struck) {
+                Hit* hit = new Hit();
+                hit->x = x;
+                hit->y = y;
+                ctrl->hits.push_back(hit);
+            } else {
+                Splash* sp = new Splash();
+                sp->x = x;
+                sp->y = y;
+                ctrl->splashes.push_back(sp);
+            }
+            break;
+        }
+    }
+}
+
 void game::GameController::control() {
     if(pge->GetKey(olc::ESCAPE).bHeld)
         endGame = true;
@@ -57,6 +102,7 @@ void game::GameController::control() {
         auto& ship = ships[i];
         switch(ship->control()){
             case GameObj::DESTROY: {
+                if(selected == ship) selected = nullptr;
                 delete ship;
                 ships.erase(ships.begin() + i);
                 i--;
@@ -69,8 +115,16 @@ void game::GameController::control() {
             }
         }
     }
-    if(pge->GetMouse(olc::Mouse::LEFT).bPressed && pge->GetMouseX() > hwidth && !select) {
-        selected = nullptr;
+    if(pge->GetMouse(olc::Mouse::LEFT).bPressed) {
+        if(pge->GetMouseX() > hwidth) {
+            if(!select) selected = nullptr;
+        } else if(selected != nullptr) {
+            int32_t mx = pge->GetMouseX() / cw,
+                    my = pge->GetMouseY() / ch;
+            uint64_t data = uint64_t(mx) << 32 | uint64_t(my);
+            
+            mp->send(SHOOT, &data, 8);
+        }
     }
 
     for(int i=0; i<splashes.size(); i++) {
@@ -120,8 +174,8 @@ void game::GameController::spawnShips(int num) {
         int tries = 10000;
         do {
             ship->dir = rand() % 2 ? Ship::HOR : Ship::VERT;
-            ship->x = rand() % width;
-            ship->y = rand() % height;
+            ship->x = rand() % (width - 2) + 1;
+            ship->y = rand() % (height - 2) + 1;
         } while(ship->collides() && --tries > 0);
 
         if(tries < 0) {
@@ -129,13 +183,32 @@ void game::GameController::spawnShips(int num) {
             break;
         }
 
-        ship->health = 3;
-
         ships.push_back(ship);
     }
 }
+bool game::GameController::landHit(int x, int y) {
+    for(auto& ship : ships) {
+        int dx = abs(x - ship->x),
+            dy = abs(y - ship->y);
+        
+        if(ship->dir == Ship::HOR ? (dx < 2 && dy < 3) : (dy < 2 && dx < 3)) {
+            ship->health--;
+            Hit* hit = new Hit(true);
+            hits.push_back(hit);
+            return true;
+        }
+    }
+    Splash* sp = new Splash(true);
+    splashes.push_back(sp);
+    return false;
+}
 
 game::GameObj::Action game::Ship::control() {
+    if(health == 0) {
+        if(--t) return DESTROY;
+        return NONE;
+    }
+
     if(ctrl->selected == this && ctrl->delay == 0) {
         bool L = pge->GetKey(olc::LEFT).bHeld,
              R = pge->GetKey(olc::RIGHT).bHeld,
@@ -196,12 +269,19 @@ game::GameObj::Action game::Ship::control() {
     return NONE;
 }
 void game::Ship::draw() {
+    const static uint32_t colorTable[] = {
+        0xFF000050, 0xFF0000A0,
+        0xFF004080, 0xFF0080FF,
+        0xFF008080, 0xFF00FFFF,
+        0xFF808080, 0xFFFFFFFF,
+    };
+    
     for(int n=-1; n<=1; n++) {
         pge->FillRect(
             ctrl->hwidth + (x + n * (dir == HOR)) * ctrl->cw + 2,
             (y + n * (dir == VERT)) * ctrl->ch + 2,
             ctrl->cw - 4, ctrl->ch - 4,
-            ctrl->selected == this ? olc::WHITE : 0xFF808080
+            colorTable[health*2 + (ctrl->selected == this)]
         );
     }
 }
@@ -228,7 +308,12 @@ game::GameObj::Action game::Splash::control() {
     return NONE;
 }
 void game::Splash::draw() {
-    pge->DrawCircle(x + ctrl->cw/2, y + ctrl->ch/2, t, olc::WHITE);
+    pge->DrawCircle(
+        x * ctrl->cw + ctrl->cw/2 + local * ctrl->hwidth,
+        y * ctrl->ch + ctrl->ch/2,
+        t,
+        olc::WHITE
+    );
 }
 
 game::GameObj::Action game::Hit::control() {
@@ -236,9 +321,9 @@ game::GameObj::Action game::Hit::control() {
     return NONE;
 }
 void game::Hit::draw() {
-    int cx = x + ctrl->cw/2,
-        cy = y + ctrl->ch/2,
-        tt = t * 10 / 7;
+    int cx = x * ctrl->cw + ctrl->cw/2 + local * ctrl->hwidth,
+        cy = y * ctrl->ch + ctrl->ch/2,
+        tt = t * 8 / 10;
 
     pge->DrawLine(cx-t, cy, cx+t, cy, 0xFF0000FF);
     pge->DrawLine(cx, cy-t, cx, cy+t, 0xFF0000FF);
