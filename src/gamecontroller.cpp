@@ -6,8 +6,12 @@
 olc::PixelGameEngine* game::GameObj::pge = nullptr;
 game::GameController* game::GameObj::ctrl = nullptr;
 
+game::GameController* game::GameController::ctrl = nullptr;
+
 game::GameController::GameController(olc::PixelGameEngine* pge, Multiplayer* mp, int width, int height):
     pge(pge), mp(mp), fps(60), width(width), height(height) {
+
+    ctrl = this;
 
     GameObj::pge = pge;
     GameObj::ctrl = this;
@@ -25,11 +29,13 @@ game::GameController::GameController(olc::PixelGameEngine* pge, Multiplayer* mp,
     selected = nullptr;
 
     spawnShips(SHIPS_TO_SPAWN);
-
     srand(time(nullptr));
-}
 
+    mp->updateCallback(&GameController::receive);
+}
 game::GameController::~GameController() {
+    if(ctrl == this) ctrl = nullptr;
+    
     for(auto& ship : ships)
         delete ship;
     for(auto& splash : splashes)
@@ -45,6 +51,43 @@ bool game::GameController::update(float delta) {
     fps.Wait();
 
     return !endGame;
+}
+
+void game::GameController::receive(int cmd, const void* data, size_t len) {
+    if(ctrl == nullptr) return;
+
+    switch(cmd) {
+        case SHOOT:{
+            int32_t x = ((int32_t*)data)[0],
+                    y = ((int32_t*)data)[1];
+
+            char reply[9];
+            *((int32_t*)(reply)) = x;
+            *((int32_t*)(reply+4)) = y;
+            reply[8] = ctrl->landHit(x,y);
+
+            ctrl->mp->send(SHOOT_REPLY, &reply, 9);
+            break;
+        }
+        case SHOOT_REPLY:{
+            int32_t x = ((int32_t*)data)[0],
+                    y = ((int32_t*)data)[1];
+            bool struck = ((char*)data)[8];
+
+            if(struck) {
+                Hit* hit = new Hit();
+                hit->x = x;
+                hit->y = y;
+                ctrl->hits.push_back(hit);
+            } else {
+                Splash* sp = new Splash();
+                sp->x = x;
+                sp->y = y;
+                ctrl->splashes.push_back(sp);
+            }
+            break;
+        }
+    }
 }
 
 void game::GameController::control() {
@@ -76,20 +119,11 @@ void game::GameController::control() {
         if(pge->GetMouseX() > hwidth) {
             if(!select) selected = nullptr;
         } else if(selected != nullptr) {
-            int mx = pge->GetMouseX() / cw,
-                my = pge->GetMouseY() / ch;
+            int32_t mx = pge->GetMouseX() / cw,
+                    my = pge->GetMouseY() / ch;
+            uint64_t data = uint64_t(mx) << 32 | uint64_t(my);
             
-            if(rand() % 2) {
-                Splash* sp = new Splash();
-                sp->x = mx;
-                sp->y = my;
-                splashes.push_back(sp);
-            } else {
-                Hit* ht = new Hit();
-                ht->x = mx;
-                ht->y = my;
-                hits.push_back(ht);
-            }
+            mp->send(SHOOT, &data, 8);
         }
     }
 

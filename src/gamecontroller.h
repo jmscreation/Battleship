@@ -77,6 +77,7 @@ namespace game {
     };
 
     class GameController {
+        static GameController* ctrl;
         olc::PixelGameEngine* pge;
         Multiplayer* mp;
         FPSLimiter fps;
@@ -92,10 +93,17 @@ namespace game {
         
         Ship* selected;
 
+        enum Commands {
+            SHOOT,
+            SHOOT_REPLY,
+        };
+
         GameController(olc::PixelGameEngine* pge, Multiplayer* mp, int width=20, int height=20);
         virtual ~GameController();
 
         virtual bool update(float delta);
+
+        static void receive(int cmd, const void* data, size_t len);
 
         void control();
         void render();
