@@ -21,7 +21,9 @@ private:
     sf::IpAddress useIP;
     const short port;
 
-    std::atomic<bool> ishost, isrunning, isconnected;
+    std::atomic<bool> ishost, isrunning, isconnected,
+        haveInData, haveOutData;
+
     std::atomic<sf::Socket::Status> syncStatus;
 
     sf::Packet in, out;

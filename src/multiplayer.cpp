@@ -5,7 +5,7 @@
 Multiplayer::Multiplayer(): socket(new sf::TcpSocket),
     tsender(new sf::Thread(sendHandle, this)), treceiver(new sf::Thread(receiveHandle, this)),
     useIP(sf::IpAddress::Any), port(55883), ishost(false), isrunning(false), isconnected(false),
-    syncStatus(sf::Socket::NotReady),
+    haveInData(false), haveOutData(false), syncStatus(sf::Socket::NotReady),
     onMessage([](int cmd, void* buf, size_t len) {
         std::cout << "unhandled message: [" << cmd << "] " << len << " bytes: ";
 
@@ -140,18 +140,22 @@ bool Multiplayer::update(float delta){
             break;
         }
         case sf::Socket::Done:{
-            sf::Int32 cmd;
-            sf::Uint64 size;
+            if(haveInData){
+                sf::Int32 cmd;
+                sf::Uint64 size;
 
-            if(!(in >> cmd >> size)) break;
+                if(!(in >> cmd >> size)) break;
 
-            const void* d = (const char*)in.getData() + sizeof(cmd) + sizeof(size);
-            if(d != nullptr){
-                memcpy(inbuffer, d, size);
+                const void* d = (const char*)in.getData() + sizeof(cmd) + sizeof(size);
+                if(d != nullptr){
+                    memcpy(inbuffer, d, size);
+                }
+                in.clear();
+
+                onMessage(cmd, inbuffer, size);
+                haveInData = false;
             }
-            in.clear();
-
-            onMessage(cmd, inbuffer, size);
+            
             break;
         }
     }
@@ -160,10 +164,13 @@ bool Multiplayer::update(float delta){
 }
 
 void Multiplayer::send(int command, const void* data, size_t length) {
+    while(haveOutData);
+
     sf::Lock lock(mutex);
 
     out << sf::Int32(command) << sf::Uint64(length);
     out.append(data, length);
+    haveOutData = true;
 }
 
 void Multiplayer::updateCallback(Multiplayer::CallbackFunction cb) {
@@ -181,7 +188,7 @@ void Multiplayer::sendHandle(Multiplayer* _this){
         
         if(!me.isconnected) continue;
 
-        {
+        if(me.haveOutData){
             sf::Lock lock(me.mutex);
             
             if(ready) {
@@ -196,6 +203,7 @@ void Multiplayer::sendHandle(Multiplayer* _this){
             switch(status){
                 case sf::Socket::Done:{
                     ready = true;
+                    me.haveOutData = false;
                     break;
                 }
                 case sf::Socket::Partial:{
@@ -211,7 +219,6 @@ void Multiplayer::sendHandle(Multiplayer* _this){
 
 void Multiplayer::receiveHandle(Multiplayer* _this) {
     
-
     Multiplayer& me = *_this;
     
     sf::Packet in;
@@ -222,7 +229,7 @@ void Multiplayer::receiveHandle(Multiplayer* _this) {
         
         if(!me.isconnected) continue;
 
-        {
+        if(!me.haveInData){
             sf::Lock lock(me.mutex);
 
             sf::Socket::Status status = me.socket->receive(in);
@@ -236,6 +243,7 @@ void Multiplayer::receiveHandle(Multiplayer* _this) {
 
             if(ready) {
                 me.in.append(in.getData(), in.getDataSize());
+                me.haveInData = true;
                 ready = false;
             }
 
