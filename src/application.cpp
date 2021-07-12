@@ -31,7 +31,7 @@ public:
 public:
 	bool OnUserCreate() {
 		mplay = new Multiplayer;
-		gamecontroller = new game::GameController(this, mplay);
+		gamecontroller = nullptr;
 		
 		std::string ip = "";
 		if(findParameter("connect", ip)){
@@ -49,10 +49,42 @@ public:
 	
 	bool OnUserUpdate(float elapsedTime) {
 
-		mplay->update(elapsedTime);
-		if(!gamecontroller->update(elapsedTime)){
-			mplay->clear(); // close mplay
+		if(mplay == nullptr) return false; // no multiplayer controller
+
+		if(!mplay->update(elapsedTime)){
+			std::cout << "Multiplayer system closed application\n";
+			delete gamecontroller;
+			gamecontroller = nullptr;
+
+			delete mplay;
+			mplay = nullptr;
+
 			return false;
+		}
+
+		if(mplay->isConnected()){
+			if(gamecontroller == nullptr){
+				gamecontroller = new game::GameController(this, mplay);
+			}
+		} else {
+			if(gamecontroller != nullptr) {
+				delete gamecontroller;
+				gamecontroller = nullptr;
+				Clear(olc::BLANK);
+			}
+		}
+		if(gamecontroller != nullptr){
+			if(!gamecontroller->update(elapsedTime)){
+				std::cout << "GameController closed application\n";
+				mplay->clear(); // close mplay
+
+				delete gamecontroller;
+				gamecontroller = nullptr;
+
+				delete mplay;
+				mplay = nullptr;
+				return false;
+			}
 		}
 		
 		return true;
@@ -67,6 +99,6 @@ int main(int argc, char** argv){
 		parameters.push_back(argv[i]);
 	}
 
-	Game app(800, 400, 2, 2);
+	Game app(800, 400, 1, 1);
 	return 0;
 }

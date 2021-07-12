@@ -1,24 +1,51 @@
 #pragma once
 
 #include "SFML/Network.hpp"
+#include "message.h"
+
+#include <atomic>
+#include <functional>
 
 
 class Multiplayer {
-    sf::TcpListener server;
-    sf::TcpSocket socket;
+public:
+    typedef std::function<void (int, void*, size_t)> CallbackFunction;
 
+private:
+    sf::TcpListener server;
+    sf::TcpSocket* socket;
+    
+    sf::Thread* tsender;
+    sf::Mutex mutex;
+
+    sf::IpAddress useIP;
     const short port;
-    bool ishost, isrunning, isconnected;
+
+    std::atomic<bool> ishost, isrunning, isconnected;
 
     sf::Packet in, out;
+
+    sf::Clock connectTimeout;
+
+    CallbackFunction onMessage;
+
+    char* inbuffer;
 
 public:
     Multiplayer();
     virtual ~Multiplayer();
 
+    static void sendHandle(Multiplayer* ths);
+
+    inline bool isHost() { return ishost; }
+    inline bool isConnected() { return isconnected; }
+
     void clear();
     void host(sf::IpAddress address = sf::IpAddress::Any);
     void connect(sf::IpAddress address);
-    void update(float delta);
+    bool update(float delta);
+
+    void send(int command, void* data, size_t length);
+    void updateCallback(CallbackFunction cb);
 
 };
