@@ -133,17 +133,20 @@ bool Multiplayer::update(float delta){
                 continue;
             }
             case sf::Socket::Done:{
-                sf::Int32 cmd;
-                sf::Uint64 size;
+                do {
+                    sf::Int32 cmd;
+                    sf::Uint64 size;
 
-                if(!(in >> cmd >> size)) break;
+                    if(!(in >> cmd >> size)) break;
 
-                if(cmd == -8000) break;
+                    const void* d = in.getData();
+                    if(d != nullptr){
+                        memcpy(inbuffer, d, size);
+                    }
+                    in.clear();
 
-                memcpy(inbuffer, in.getData(), size);
-                in.clear();
-
-                onMessage(cmd, inbuffer, size);
+                    onMessage(cmd, inbuffer, size);
+                } while(!in.endOfPacket());
 
                 break;
             }
@@ -155,10 +158,10 @@ bool Multiplayer::update(float delta){
     return true;
 }
 
-void Multiplayer::send(int command, void* data, size_t length) {
+void Multiplayer::send(int command, const void* data, size_t length) {
     sf::Lock lock(mutex);
 
-    out << sf::Int32(command);
+    out << sf::Int32(command) << sf::Uint64(length);
     out.append(data, length);
 }
 
@@ -175,12 +178,13 @@ void Multiplayer::sendHandle(Multiplayer* _this){
     while(1){
         sf::sleep(sf::milliseconds(2));
         
-        if(!me.isrunning) continue;
+        if(!me.isconnected) continue;
 
         if(ready) {
             sf::Lock lock(me.mutex);
             out.clear();
-            out << me.out; // copy packet
+            out.append(me.out.getData(), me.out.getDataSize()); // copy packet
+            me.out.clear();
             ready = false;
         }
 

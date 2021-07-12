@@ -45,7 +45,7 @@ public:
     void connect(sf::IpAddress address);
     bool update(float delta);
 
-    void send(int command, void* data, size_t length);
+    void send(int command, const void* data, size_t length);
     void updateCallback(CallbackFunction cb);
 
 };
