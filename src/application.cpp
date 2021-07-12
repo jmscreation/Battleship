@@ -63,6 +63,16 @@ public:
 		}
 
 		if(mplay->isConnected()){
+			// send a test message
+			/*
+			static sf::Clock test;
+			if(test.getElapsedTime().asSeconds() > 1.0f) {
+				const char* data = "hello world";
+				mplay->send(10, (const void*)data, 11);
+				test.restart();
+			}
+			*/
+
 			if(gamecontroller == nullptr){
 				gamecontroller = new game::GameController(this, mplay);
 			}
