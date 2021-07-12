@@ -2,6 +2,7 @@
 
 #define SHIPS_TO_SPAWN 10
 #define DELAY_TIME 20
+#define BLAST_STEPS 6
 
 olc::PixelGameEngine* game::GameObj::pge = nullptr;
 game::GameController* game::GameObj::ctrl = nullptr;
@@ -28,8 +29,8 @@ game::GameController::GameController(olc::PixelGameEngine* pge, Multiplayer* mp,
 
     selected = nullptr;
 
-    spawnShips(SHIPS_TO_SPAWN);
     srand(time(nullptr));
+    spawnShips(SHIPS_TO_SPAWN);
 
     mp->updateCallback(&GameController::receive);
 }
@@ -61,10 +62,11 @@ void game::GameController::receive(int cmd, const void* data, size_t len) {
             MsgShoot* msg = (MsgShoot*)data;
 
             int x = msg->x,
-                y = msg->y;
+                y = msg->y,
+                hit = ctrl->landHit(x,y);
 
             MsgShootReply reply{
-                x, y, ctrl->landHit(x,y),
+                x, y, hit,
             };
             ctrl->mp->send(SHOOT_REPLY, &reply, sizeof(reply));
             break;
@@ -72,16 +74,20 @@ void game::GameController::receive(int cmd, const void* data, size_t len) {
         case SHOOT_REPLY:{
             MsgShootReply* msg = (MsgShootReply*)data;
 
+            int x = msg->x,
+                y = msg->y;
+
             if(msg->status) {
-                Hit* hit = new Hit();
-                hit->x = msg->x;
-                hit->y = msg->y;
-                ctrl->hits.push_back(hit);
+                ctrl->hits.push_back(new Hit(x,y));
+                if(msg->status == 2) {
+                    ctrl->hits.push_back(new Hit(x-1,y));
+                    ctrl->hits.push_back(new Hit(x+1,y));
+                } else if(msg->status == 3) {
+                    ctrl->hits.push_back(new Hit(x,y-1));
+                    ctrl->hits.push_back(new Hit(x,y+1));
+                }
             } else {
-                Splash* sp = new Splash();
-                sp->x = msg->x;
-                sp->y = msg->y;
-                ctrl->splashes.push_back(sp);
+                ctrl->splashes.push_back(new Splash(x,y));
             }
             break;
         }
@@ -124,7 +130,7 @@ void game::GameController::control() {
                 mx, my,
             };
             mp->send(SHOOT, &msg, sizeof(msg));
-            delay = DELAY_TIME;
+            delay = DELAY_TIME * 2;
         }
     }
 
@@ -170,7 +176,7 @@ void game::GameController::render() {
 
 void game::GameController::spawnShips(int num) {
     for(int i=0; i<num; i++) {
-        Ship* ship = new Ship();
+        Ship* ship = new Ship(0,0);
 
         int tries = 10000;
         do {
@@ -187,31 +193,31 @@ void game::GameController::spawnShips(int num) {
         ships.push_back(ship);
     }
 }
-int game::GameController::landHit(int x, int y) {
+int game::GameController::landHit(int& x, int& y) {
     for(auto& ship : ships) {
         int dx = abs(x - ship->x),
             dy = abs(y - ship->y);
         
         if(ship->dir == Ship::HOR ? (dx < 2 && dy < 1) : (dy < 2 && dx < 1)) {
+            if(!ship->health) return 0;
+
             ship->health--;
-            Hit* hit = new Hit(true);
-            hit->x = x;
-            hit->y = y;
-            hits.push_back(hit);
-            if(!ship->health) return 2;
+            hits.push_back(new Hit(x,y, true));
+            if(!ship->health) {
+                x = ship->x;
+                y = ship->y;
+                return 2 + (ship->dir == Ship::VERT);
+            }
             return 1;
         }
     }
-    Splash* sp = new Splash(true);
-    sp->x = x;
-    sp->y = y;
-    splashes.push_back(sp);
+    splashes.push_back(new Splash(x,y, true));
     return 0;
 }
 
 game::GameObj::Action game::Ship::control() {
     if(health == 0) {
-        if(!--t) return DESTROY;
+        if(--t <= 0) return DESTROY;
         return NONE;
     }
 
@@ -310,25 +316,26 @@ bool game::Ship::collides() {
 }
 
 game::GameObj::Action game::Splash::control() {
-    if(++t > ctrl->cw/2) return DESTROY;
+    if(++t > ctrl->cw/2 * BLAST_STEPS) return DESTROY;
     return NONE;
 }
 void game::Splash::draw() {
     pge->DrawCircle(
         x * ctrl->cw + ctrl->cw/2 + local * ctrl->hwidth,
         y * ctrl->ch + ctrl->ch/2,
-        t,
+        t / 3 % (ctrl->cw/2),
         olc::WHITE
     );
 }
 
 game::GameObj::Action game::Hit::control() {
-    if(++t > ctrl->cw/2) return DESTROY;
+    if(++t > ctrl->cw/2 * BLAST_STEPS) return DESTROY;
     return NONE;
 }
 void game::Hit::draw() {
     int cx = x * ctrl->cw + ctrl->cw/2 + local * ctrl->hwidth,
         cy = y * ctrl->ch + ctrl->ch/2,
+        t = this->t / 3 % (ctrl->cw/2),
         tt = t * 8 / 10;
 
     pge->DrawLine(cx-t, cy, cx+t, cy, 0xFF0000FF);

@@ -41,13 +41,15 @@ namespace game {
             NONE, DESTROY, SELECT,
         };
 
+        GameObj(int x, int y): x(x), y(y) {}
+
         int x, y;
         virtual Action control() = 0;
         virtual void draw() = 0;
     };
 
     struct Ship: public GameObj {
-        Ship(): dir(Dir::HOR), health(3), t(60) {}
+        Ship(int x, int y): GameObj(x,y), dir(Dir::HOR), health(3), t(60) {}
 
         enum Dir {
             HOR, VERT,
@@ -60,7 +62,7 @@ namespace game {
         bool collides();
     };
     struct Splash: public GameObj {
-        Splash(bool local=false): t(0), local(local) {}
+        Splash(int x, int y, bool local=false): GameObj(x,y), t(0), local(local) {}
         
         int t;
         bool local;
@@ -69,7 +71,7 @@ namespace game {
         virtual void draw();
     };
     struct Hit: public GameObj {
-        Hit(bool local=false): t(0), local(local) {}
+        Hit(int x, int y, bool local=false): GameObj(x,y), t(0), local(local) {}
 
         int t;
         bool local;
@@ -118,7 +120,7 @@ namespace game {
         void render();
 
         void spawnShips(int num);
-        int landHit(int x, int y);
+        int landHit(int& x, int& y);
 
         std::vector<Ship*> ships;
         std::vector<Splash*> splashes;
