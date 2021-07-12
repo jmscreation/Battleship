@@ -77,18 +77,22 @@ bool Multiplayer::update(float delta){
     sf::Socket::Status status;
 
     if(!isconnected){
+        sf::Packet ignore;
 
         if(ishost){
             status = server.accept(*socket);
         } else {
-            status = socket->receive(in);
+            status = socket->receive(ignore);
         }
 
         switch(status){
             case sf::Socket::Done:{
-                std::cout << "Client connected\n";
+                std::cout << "Socket connected\n";
                 isconnected = true;
-                server.close();
+                if(ishost){
+                    server.close();
+                    socket->send(ignore);
+                }
 
                 break;
             }
@@ -184,7 +188,7 @@ void Multiplayer::sendHandle(Multiplayer* _this){
     bool ready = true;
 
     while(1){
-        sf::sleep(sf::milliseconds(30));
+        sf::sleep(sf::milliseconds(2));
         
         if(!me.isconnected) continue;
 
@@ -225,7 +229,7 @@ void Multiplayer::receiveHandle(Multiplayer* _this) {
     bool ready = false;
 
     while(1){
-        sf::sleep(sf::milliseconds(30));
+        sf::sleep(sf::milliseconds(2));
         
         if(!me.isconnected) continue;
 
