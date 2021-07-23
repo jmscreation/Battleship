@@ -21,7 +21,7 @@ public:
 	Game(uint32_t w, uint32_t h, uint32_t px = 1, uint32_t py = 1) {
 		sAppName = "Battleship In A Day";
 		
-		if(Construct(w, h, px, py)){
+		if(Construct(w, h, px, py, false, true)){
 			Start();
 		}
 	}
