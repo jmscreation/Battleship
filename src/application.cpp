@@ -1,6 +1,7 @@
 #include "olcPixelGameEngine.h"
 #include "gamecontroller.h"
 #include "multiplayer.h"
+#include "freedialog.h"
 
 #include <vector>
 #include <string>
@@ -44,14 +45,29 @@ public:
 		gamecontroller = nullptr;
 		
 		std::string ip = "";
-		if(findParameter("connect", ip)){
-			mplay->connect(sf::IpAddress(ip));
+		bool connect = findParameter("connect", ip),
+			 host = findParameter("host", ip);
+
+		if(!connect && !host){
+			freedialog::QuestionDialog askServer("Would you like to host the game?");
+			if(askServer.result() == freedialog::Yes){
+				host = true;
+			} else {
+				connect = true;
+				while(!freedialog::getIPAddress(ip, "Connect To", "Enter IP Address of game server"));
+			}
 		}
-		if(findParameter("host", ip)){
+
+		if(connect){
+			mplay->connect(sf::IpAddress(ip));
+			return true;
+		}
+		if(host){
 			if(ip != "")
 				mplay->host(sf::IpAddress(ip));
 			else
 				mplay->host();
+			return true;
 		}
 
 		return true;
