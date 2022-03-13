@@ -6,9 +6,12 @@ This game was made in less than 10 hours.
 
 # How to Build
 
-To build using the GCC MinGW 64bit compiler, run the build script provided. You need to have your compiler bin folder path configured.
+This comes with a pre-configured build script. In order to build this project, you need to first install into the repository some dependency libraries. This can be done very quickly using the [Dependency Tracker](https://github.com/jmscreation/dependency-tracker).
+With the Dependency Tracker configured, run the `deps -update` in this repository to automatically update all dependencies.
 
-Other compiler support is unavailable, as this project relies on prebuilt Windows 64bit static libraries.
+Now for the build process, you need to use the GCC MinGW 64bit compiler. You can run the build script provided once you have your compiler bin folder path properly configured.
+
+Other compiler support is unavailable because this project relies on prebuilt Windows 64bit static libraries *which were compiled with MinGW64 MSVCRT*
 
 # Launching the Game
 
@@ -31,4 +34,4 @@ With a selected ship, you are able to move the ship by using the arrow keys.
 
 The player to lose all their ships first loses the game. There is currently no victory screen.
 
-Currently the game play is limited to this interaction.
+Currently the game play is quite boring and limited to this basic interaction.
