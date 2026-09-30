@@ -5,6 +5,7 @@
 
 #include <vector>
 #include <string>
+#include <atomic>
 
 std::vector<std::string> parameters;
 
@@ -17,15 +18,23 @@ bool findParameter(const std::string& para, std::string& value){
 	return found;
 }
 
+class Game;
+
+static Game* application;
+
 class Game : olc::PixelGameEngine {
+
 public:
 	Game(uint32_t w, uint32_t h, uint32_t px = 1, uint32_t py = 1) {
 		sAppName = "Battleship In A Day";
+		application = this;
 		
 		if(Construct(w, h, px, py, false, true)){
 			Start();
 		}
 	}
+	
+	
 	game::GameController* gamecontroller;
 	Multiplayer* mplay;
 
@@ -38,6 +47,18 @@ public:
 	void endGame() {
 		delete gamecontroller;
 		gamecontroller = nullptr;
+	}
+
+	enum Commands {
+		BEGIN_GAME,
+	};
+
+	std::atomic_bool begin_game = false;
+
+	static void prepare_receive(int cmd, const void* data, size_t len) {
+		if(cmd == BEGIN_GAME){
+			application->begin_game = true;
+		}
 	}
 
 	bool OnUserCreate() {
@@ -57,6 +78,8 @@ public:
 				while(!freedialog::getIPAddress(ip, "Connect To", "Enter IP Address of game server"));
 			}
 		}
+
+		mplay->updateCallback(prepare_receive);
 
 		if(connect){
 			mplay->connect(sf::IpAddress(ip));
@@ -86,7 +109,20 @@ public:
 
 		if(mplay->isConnected()){
 			if(gamecontroller == nullptr){
-				gamecontroller = new game::GameController(this, mplay);
+				if(mplay->isHost()){
+					Clear(olc::BLANK);
+					DrawString(16, 48, "Press Enter To Begin");
+					if(GetKey(olc::ENTER).bPressed){
+						mplay->send(BEGIN_GAME, nullptr, 0);
+						gamecontroller = new game::GameController(this, mplay);
+					}
+				} else {
+					Clear(olc::BLANK);
+					DrawString(16, 48, "Waiting For The Host To Start...");
+					if(begin_game){
+						gamecontroller = new game::GameController(this, mplay);
+					}
+				}
 			}
 		} else {
 			if(mplay->isHost()){
